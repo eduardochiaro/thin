@@ -8,6 +8,11 @@ static Time s_last_time, s_anim_time;
 static char s_weekday_buffer[8], s_month_buffer[8], s_day_in_month_buffer[3];
 static bool s_animating, s_connected;
 
+static GFont s_time_font;
+static GFont s_weather_font;
+
+static TextLayer *s_weather_layer;
+
 static void tick_handler(struct tm *tick_time, TimeUnits changed) {
   s_last_time.days = tick_time->tm_mday;
   s_last_time.hours = tick_time->tm_hour;
@@ -23,6 +28,9 @@ static void tick_handler(struct tm *tick_time, TimeUnits changed) {
   text_layer_set_text(s_weekday_layer, s_weekday_buffer);
   text_layer_set_text(s_day_in_month_layer, s_day_in_month_buffer);
   text_layer_set_text(s_month_layer, s_month_buffer);
+
+
+  text_layer_set_text(s_weather_layer, "0˚");
 
   // Finally
   layer_mark_dirty(s_canvas_layer);
@@ -41,7 +49,7 @@ static void animation_stopped(Animation *anim, bool stopped, void *context) {
     tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
   } else {
     tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
-  }  
+  }
 
 #ifdef PBL_PLATFORM_APLITE
   animation_destroy(anim);
@@ -143,7 +151,7 @@ static int hours_to_minutes(int hours_out_of_12) {
 
 static void draw_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
-  GPoint center = grect_center_point(&bounds);  
+  GPoint center = grect_center_point(&bounds);
 
 #ifdef PBL_PLATFORM_BASALT
   graphics_context_set_antialiased(ctx, ANTIALIASING);
@@ -180,7 +188,7 @@ static void draw_proc(Layer *layer, GContext *ctx) {
   // Draw hands
 #ifdef PBL_COLOR
   graphics_context_set_stroke_color(ctx, GColorLightGray);
-#elif PBL_BW 
+#elif PBL_BW
   graphics_context_set_stroke_color(ctx, GColorWhite);
 #endif
   for(int y = 0; y < THICKNESS; y++) {
@@ -249,6 +257,7 @@ static void window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
 
+
   s_bg_layer = layer_create(bounds);
   layer_set_update_proc(s_bg_layer, bg_update_proc);
   layer_add_child(window_layer, s_bg_layer);
@@ -283,6 +292,25 @@ static void window_load(Window *window) {
     layer_add_child(window_layer, text_layer_get_layer(s_month_layer));
   }
 
+
+
+  // Create temperature Layer
+  s_weather_layer = text_layer_create(GRect(0, 68, 44, 40));
+  text_layer_set_background_color(s_weather_layer, GColorClear);
+#ifdef PBL_COLOR
+  text_layer_set_text_color(s_weather_layer, GColorChromeYellow);
+#elif PBL_BW
+  text_layer_set_text_color(s_weather_layer, GColorWhite);
+#endif
+  text_layer_set_text_alignment(s_weather_layer, GTextAlignmentCenter);
+
+  // Create second custom font, apply it and add to Window
+  text_layer_set_font(s_weather_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
+  layer_add_child(window_layer, text_layer_get_layer(s_weather_layer));
+
+
+
+
   s_canvas_layer = layer_create(bounds);
   layer_set_update_proc(s_canvas_layer, draw_proc);
   layer_add_child(window_layer, s_canvas_layer);
@@ -295,6 +323,10 @@ static void window_unload(Window *window) {
   text_layer_destroy(s_weekday_layer);
   text_layer_destroy(s_day_in_month_layer);
   text_layer_destroy(s_month_layer);
+
+  // Destroy weather elements
+text_layer_destroy(s_weather_layer);
+fonts_unload_custom_font(s_weather_font);
 
   // Self destroying
   window_destroy(s_main_window);
@@ -330,7 +362,7 @@ void main_window_push() {
   struct tm *tm_now = localtime(&t);
   s_last_time.hours = tm_now->tm_hour;
   s_last_time.minutes = tm_now->tm_min;
-  s_last_time.seconds = tm_now->tm_sec;  
+  s_last_time.seconds = tm_now->tm_sec;
 
   if(config_get(PERSIST_KEY_BT)) {
     bluetooth_connection_service_subscribe(bt_handler);
