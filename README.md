@@ -1,6 +1,6 @@
-# thin
+# thin weather
 
-Simple, customizable Pebble watchface with splashes of color. 
+Simple, customizable Pebble watchface with splashes of color + weather. 
 
 Runs on both Pebble/Pebble Steel and Pebble Time/Time Steel.
 
