@@ -9,9 +9,35 @@ static char s_weekday_buffer[8], s_month_buffer[8], s_day_in_month_buffer[3];
 static bool s_animating, s_connected;
 
 static GFont s_time_font;
-static GFont s_weather_font;
 
+static GFont s_weather_font;
 static TextLayer *s_weather_layer;
+
+static AppSync s_sync;
+static uint8_t s_sync_buffer[64];
+
+enum WeatherKey {
+ // WEATHER_ICON_KEY = 0x0,         // TUPLE_INT
+  WEATHER_TEMPERATURE_KEY = 0x1,  // TUPLE_CSTRING
+  WEATHER_CITY_KEY = 0x2,         // TUPLE_CSTRING
+};
+
+static void sync_error_callback(DictionaryResult dict_error, AppMessageResult app_message_error, void *context) {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "App Message Sync Error: %d", app_message_error);
+}
+
+static void sync_tuple_changed_callback(const uint32_t key, const Tuple* new_tuple, const Tuple* old_tuple, void* context) {
+  switch (key) {
+    case WEATHER_TEMPERATURE_KEY:
+      // App Sync keeps new_tuple in s_sync_buffer, so we may use it directly
+      text_layer_set_text(s_weather_layer, new_tuple->value->cstring);
+      break;
+
+    case WEATHER_CITY_KEY:
+      //text_layer_set_text(s_city_layer, new_tuple->value->cstring);
+      break;
+  }
+}
 
 static void tick_handler(struct tm *tick_time, TimeUnits changed) {
   s_last_time.days = tick_time->tm_mday;
@@ -29,8 +55,6 @@ static void tick_handler(struct tm *tick_time, TimeUnits changed) {
   text_layer_set_text(s_day_in_month_layer, s_day_in_month_buffer);
   text_layer_set_text(s_month_layer, s_month_buffer);
 
-
-  text_layer_set_text(s_weather_layer, "0˚");
 
   // Finally
   layer_mark_dirty(s_canvas_layer);
@@ -253,6 +277,23 @@ static void batt_handler(BatteryChargeState state) {
   layer_mark_dirty(s_canvas_layer);
 }
 
+
+static void request_weather(void) {
+  DictionaryIterator *iter;
+  app_message_outbox_begin(&iter);
+
+  if (!iter) {
+    // Error creating outbound message
+    return;
+  }
+
+  int value = 1;
+  dict_write_int(iter, 1, &value, sizeof(int), true);
+  dict_write_end(iter);
+
+  app_message_outbox_send();
+}
+
 static void window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
@@ -292,8 +333,12 @@ static void window_load(Window *window) {
     layer_add_child(window_layer, text_layer_get_layer(s_month_layer));
   }
 
-
-
+  s_canvas_layer = layer_create(bounds);
+  layer_set_update_proc(s_canvas_layer, draw_proc);
+  layer_add_child(window_layer, s_canvas_layer);
+	
+	 text_layer_set_text(s_weather_layer, "0˚");
+	
   // Create temperature Layer
   s_weather_layer = text_layer_create(GRect(0, 68, 44, 40));
   text_layer_set_background_color(s_weather_layer, GColorClear);
@@ -303,17 +348,22 @@ static void window_load(Window *window) {
   text_layer_set_text_color(s_weather_layer, GColorWhite);
 #endif
   text_layer_set_text_alignment(s_weather_layer, GTextAlignmentCenter);
-
+	
   // Create second custom font, apply it and add to Window
   text_layer_set_font(s_weather_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
   layer_add_child(window_layer, text_layer_get_layer(s_weather_layer));
+	
+  Tuplet initial_values[] = {
+    //TupletInteger(WEATHER_ICON_KEY, (uint8_t) 1),
+    TupletCString(WEATHER_TEMPERATURE_KEY, "1234\u00B0C"),
+    //TupletCString(WEATHER_CITY_KEY, "St Pebblesburg"),
+  };
 
+  app_sync_init(&s_sync, s_sync_buffer, sizeof(s_sync_buffer),
+      initial_values, ARRAY_LENGTH(initial_values),
+      sync_tuple_changed_callback, sync_error_callback, NULL);
 
-
-
-  s_canvas_layer = layer_create(bounds);
-  layer_set_update_proc(s_canvas_layer, draw_proc);
-  layer_add_child(window_layer, s_canvas_layer);
+  request_weather();
 }
 
 static void window_unload(Window *window) {
@@ -323,11 +373,11 @@ static void window_unload(Window *window) {
   text_layer_destroy(s_weekday_layer);
   text_layer_destroy(s_day_in_month_layer);
   text_layer_destroy(s_month_layer);
-
+	
   // Destroy weather elements
-text_layer_destroy(s_weather_layer);
-fonts_unload_custom_font(s_weather_font);
-
+		text_layer_destroy(s_weather_layer);
+		fonts_unload_custom_font(s_weather_font);
+	
   // Self destroying
   window_destroy(s_main_window);
 }

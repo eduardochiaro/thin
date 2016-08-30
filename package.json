@@ -1,0 +1,39 @@
+{
+    "author": "Eduardo Chiaro",
+    "dependencies": {},
+    "keywords": [],
+    "name": "thin-weather",
+    "pebble": {
+        "capabilities": [
+            "location",
+            "configurable"
+        ],
+        "displayName": "Thin Weather",
+        "enableMultiJS": true,
+        "messageKeys": [
+            "PERSIST_KEY_DATE",
+            "PERSIST_KEY_DAY",
+            "PERSIST_KEY_BT",
+            "PERSIST_KEY_BATTERY",
+            "PERSIST_KEY_SECOND_HAND",
+            "WEATHER_TEMPERATURE_KEY",
+            "WEATHER_TEMPERATURE_KEY",
+            "WEATHER_ICON_KEY"
+        ],
+        "projectType": "native",
+        "resources": {
+            "media": []
+        },
+        "sdkVersion": "3",
+        "targetPlatforms": [
+            "aplite",
+            "basalt",
+            "diorite"
+        ],
+        "uuid": "8d01618e-3dbd-43c8-8ab1-507dc302dba8",
+        "watchapp": {
+            "watchface": true
+        }
+    },
+    "version": "1.1.0"
+}
